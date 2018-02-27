@@ -190,7 +190,7 @@ class RecvDataThread(threading.Thread):
             SendData("@2:0:0.00:0.00:0.0#")
             time.sleep(0.01)
 			
-#
+
 
 def recv_data():
     print("In receiving thread")
@@ -199,11 +199,17 @@ def recv_data():
     data, (Addr, Port)=RecSocketUdp.recvfrom(512)
     if len(data) > 0:
         print(data)
+        NewData=data.encode()
         DevidedData=[]
-		
+        global file
+        DevidedData=NewData.split(":")
+        for x in range(len(DevidedData)):
+            file.write(DevidedData[x]+'\t')
+        file.write("\n")
 	#print(time.ctime())
 
 
+	
 	
 #Panel Appearance
 Win.title("Quadcopter GUI")
