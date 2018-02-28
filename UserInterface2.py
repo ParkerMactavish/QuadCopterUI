@@ -11,6 +11,12 @@ import datetime						#for test
 import threading					#multi threading 
 import os							#control command line
 
+
+#hold altitude flag
+AltFlag=0
+SyncFlag=0
+
+
 #define IP and Port
 IP="192.168.1.1"
 Port=239
@@ -66,9 +72,13 @@ LowerCellValues=[1000, -4, 8, 2.5, 70]
 ThrottleSide=tk.StringVar()
 ThrottleSide.set("L")
 CheckButtonValueList=[]
+CheckButtonValueBuf=[]
 for x in range(11):
 	CheckButtonValueList.append(tk.IntVar())
-	CheckButtonValueList[x].set(1)
+	CheckButtonValueList[x].set(1)	
+	CheckButtonValueBuf.append(CheckButtonValueList[x].get())
+	print(type(CheckButtonValueBuf[x]))
+	
 	
 ButtonList=[]#list for buttons
 ButtonTexts=["LOCK", "UNLOCK", "SYNC", "ALTHOLD"]#texts for buttons
@@ -82,7 +92,9 @@ LowerCellList=[]
 RadioButtonList=[]
 
 CheckButtonList=[]
-CheckButtonLabel=["pitch", "roll", "yaw", "atmosphere", "height", "throttle", "rot1", "rot2", "rot3", "rot4", "voltage"]
+CheckButtonLabel=["pitch", "roll", "yaw", "atm", "height", "throt", "rot1", "rot2", "rot3", "rot4", "volt"]
+
+
 
 #Opening config file
 FilExst=os.path.isfile("config.txt")
@@ -108,7 +120,8 @@ if bool(Buffer):
     for x in range(11):
         TmpChar=TmpFile.readline()
         TmpChar=TmpChar[:-1]
-        CheckButtonValueList[x].set(int(TmpChar))
+        CheckButtonValueList[x].set(int(TmpChar))		
+        CheckButtonValueBuf[x]=CheckButtonValueList[x].get()
         #if data exists, then get it from file
 
 else:
@@ -124,7 +137,7 @@ else:
 
     for x in range(11):
         TmpFile.write(str(CheckButtonValueList[x].get())+"\n")
-	
+        CheckButtonValueBuf[x]=CheckButtonValueList[x].get()
         #if there's no data, then store the defalt to file
 TmpFile.close()
 
@@ -138,10 +151,12 @@ file=open(str(Time.now().month).zfill(2)+"."+str(Time.now().day)+" "+str(Time.no
 TmpStr=""
 for x in range(len(CheckButtonLabel)):
 	if CheckButtonValueList[x].get()==1:
-		TmpStr+=CheckButtonLabel[x]+","
+		TmpStr+=CheckButtonLabel[x]+"\t"
+		print(1)
 		
 TmpStr=TmpStr[:-1]
-file.write(TmpStr)
+print(TmpStr)
+file.write(TmpStr+'\n')
 
 
 
@@ -160,10 +175,9 @@ def SendData(OriginalData=""):
 		Data=OriginalData
 		
 	DstAddr=(IP, Port)
-	SendSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	try:
+		SendSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		SendSocketUdp.sendto(Data.encode(), DstAddr)
-		print(Data)
 	except:
 		messagebox.showwarning("Quad Copter","Target IP not Available")
 
@@ -171,16 +185,17 @@ SendData()
 
 
 #UDP send/receive thread
+RecSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 class RecvDataThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)        
-        RecSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         HostAddr=('', Port)
         try:	
             RecSocketUdp.bind(HostAddr)
         except:
             messagebox.showwarning("Quadcopter", "Host Address not available")
     def run(self):
+        global UIActiveFlag
         while UIActiveFlag:
             try:
                 recv_data()
@@ -194,18 +209,27 @@ class RecvDataThread(threading.Thread):
 
 def recv_data():
     print("In receiving thread")
-    Addr=('', Port)
-    data=b''
+    global Port
+    global RecSocketUdp
+    global SyncFlag
+	
+    Addr=('', Port)	
     data, (Addr, Port)=RecSocketUdp.recvfrom(512)
-    if len(data) > 0:
+    if len(data)>0 and SyncFlag==0:
         print(data)
-        NewData=data.encode()
+        print(type(data))
+        NewData=data.decode()
+        NewData=NewData[1:-1]
         DevidedData=[]
         global file
         DevidedData=NewData.split(":")
+        TmpStr=""
         for x in range(len(DevidedData)):
-            file.write(DevidedData[x]+'\t')
-        file.write("\n")
+            if CheckButtonValueBuf[x]==1:
+                TmpStr+=(DevidedData[x]+'\t')
+                #TmpStr+=str(CheckButtonValueBuf[x])+'\t'
+        TmpStr+='\n'
+        file.write(TmpStr)
 	#print(time.ctime())
 
 
@@ -233,6 +257,12 @@ def get_value(entry):
     return var
 
 def Sync_Button():
+    global CheckButtonValueList
+    global file
+    global SyncFlag
+	
+    SyncFlag=1
+	
     cnt=0
     TmpFile = open("config.txt", "w")
     for x in UpperCells:
@@ -255,7 +285,7 @@ def Sync_Button():
 	
     for x in range(11):
         TmpFile.write(str(CheckButtonValueList[x].get())+"\n")
-	
+        CheckButtonValueBuf[x]=CheckButtonValueList[x].get()
     messagebox.showwarning("Quad Copter","Arguments have been saved")
 	
     SendData()
@@ -264,17 +294,21 @@ def Sync_Button():
 	
 	
 	#Create a file for data when sychronizing
-    global file
+	
     file.close()
     Time=datetime.datetime
     file=open(str(Time.now().month).zfill(2)+"."+str(Time.now().day)+" "+str(Time.now().hour)+"-"+str(Time.now().minute)+"-"+str(Time.now().second)+".txt", "w")
 	
     TmpStr=""
     for x in range(len(CheckButtonLabel)):
-        if CheckButtonValueList[x].get()==1:
-            TmpStr+=CheckButtonLabel[x]+","
+        if CheckButtonValueBuf[x]==1:
+            TmpStr+=CheckButtonLabel[x]+"\t"
     TmpStr=TmpStr[:-1]
-    file.write(TmpStr)
+    file.write(TmpStr+"\n")
+	
+	
+    SyncFlag=0
+	
 	
 	
 
@@ -287,7 +321,13 @@ def Unlock_Button():
     messagebox.showwarning("Quadcopter", "Quadcopter Unlocked")
 
 def AltHold_Button():
-    return 0
+    global AltFlag	
+    if AltFlag==0:
+        SendData("@1:2#")
+        AltFlag=1
+    else:
+        SendData("@1:3#")
+        AltFlag=0
 ButtonEvents=[Lock_Button, Unlock_Button, Sync_Button, AltHold_Button]
 
 
