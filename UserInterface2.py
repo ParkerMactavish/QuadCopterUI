@@ -81,7 +81,7 @@ for x in range(11):
 	
 	
 ButtonList=[]#list for buttons
-ButtonTexts=["LOCK", "UNLOCK", "SYNC", "ALTHOLD"]#texts for buttons
+ButtonTexts=["LOCK", "UNLOCK", "SYNC", "ALTHOLD", "ALTUNHOLD"]#texts for buttons
 LabelList=[]#list for labels
 LabelTexts=["PID", "P", "I", "I Limit", "D"]#texts for labels
 UpperCells=collections.OrderedDict([("Attitude Roll",[]), ("Attitude Pitch",[]), ("Attitude Yaw",[]), ("Attitude Height", []),
@@ -163,21 +163,34 @@ file.write(TmpStr+'\n')
 #UDP sends data
 def SendData(OriginalData=""):
 	if len(OriginalData)==0:
-		Data="@"
+		Data1="@4:"
 		for x in range(len(UpperCellValues)):
 			for y in range(len(UpperCellValues[x])):
-				Data+=str(UpperCellValues[x][y])
-				Data=Data[:-1]
-				Data+=":"
-		Data=Data[:-1]
-		Data+="#"
+				Data1+=str(UpperCellValues[x][y])
+				Data1=Data1[:-1]
+				Data1+=":"
+		Data1=Data1[:-1]
+		Data1+="#"
+		
+		Data2="@6:"
+		for x in range(len(LowerCellValues)):
+			Data2+=str(LowerCellValues[x])
+			Data2=Data2[:-1]
+			Data2+=":"
+		Data2=Data2[:-1]
+		Data2+="#"
+		
 	else:
-		Data=OriginalData
+		Data1=OriginalData
+		Data2=""
+		
 		
 	DstAddr=(IP, Port)
 	try:
 		SendSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		SendSocketUdp.sendto(Data.encode(), DstAddr)
+		SendSocketUdp.sendto(Data1.encode(), DstAddr)
+		if len(Data2)>0:
+			SendSocketUdp.sendto(Data2.encode(), DstAddr)
 	except:
 		messagebox.showwarning("Quad Copter","Target IP not Available")
 
@@ -208,30 +221,31 @@ class RecvDataThread(threading.Thread):
 
 
 def recv_data():
-    print("In receiving thread")
+    #print("In receiving thread")
     global Port
     global RecSocketUdp
     global SyncFlag
-	
-    Addr=('', Port)	
-    data, (Addr, Port)=RecSocketUdp.recvfrom(512)
-    if len(data)>0 and SyncFlag==0:
-        print(data)
-        print(type(data))
-        NewData=data.decode()
-        NewData=NewData[1:-1]
-        DevidedData=[]
-        global file
-        DevidedData=NewData.split(":")
-        TmpStr=""
-        for x in range(len(DevidedData)):
-            if CheckButtonValueBuf[x]==1:
-                TmpStr+=(DevidedData[x]+'\t')
-                #TmpStr+=str(CheckButtonValueBuf[x])+'\t'
-        TmpStr+='\n'
-        file.write(TmpStr)
-	#print(time.ctime())
-
+    try:
+    	Addr=('', Port)	
+    	data, (Addr, Port)=RecSocketUdp.recvfrom(512)
+    	if len(data)>0 and SyncFlag==0:
+        	print(data)
+        	#print(type(data))
+        	NewData=data.decode()
+        	NewData=NewData[1:-1]
+        	DevidedData=[]
+        	global file
+        	DevidedData=NewData.split(":")
+        	TmpStr=""
+        	for x in range(len(DevidedData)):
+                	if CheckButtonValueBuf[x]==1:
+                		TmpStr+=(DevidedData[x]+'\t')
+                		#TmpStr+=str(CheckButtonValueBuf[x])+'\t'
+        	TmpStr+='\n'
+        	file.write(TmpStr)
+		#print(time.ctime())
+    except:
+        None
 
 	
 	
@@ -321,20 +335,20 @@ def Unlock_Button():
     messagebox.showwarning("Quadcopter", "Quadcopter Unlocked")
 
 def AltHold_Button():
-    global AltFlag	
-    if AltFlag==0:
-        SendData("@1:2#")
-        AltFlag=1
-    else:
-        SendData("@1:3#")
-        AltFlag=0
-ButtonEvents=[Lock_Button, Unlock_Button, Sync_Button, AltHold_Button]
+    SendData("@1:2#")
+    messagebox.showwarning("Quadcopter", "Quadcopter Altitude Hold")
+	
+def AltUnHold_Button():
+    SendData("@1:3#")
+    messagebox.showwarning("Quadcopter", "Quadcopter Altitude Unhold")
+	
+ButtonEvents=[Lock_Button, Unlock_Button, Sync_Button, AltHold_Button, AltUnHold_Button]
 
 
 
 #Buttons
 for x in range(len(ButtonTexts)):
-    ButtonList.append((ttk.Button(ButtonFrame, text=ButtonTexts[x], style="TButton", width=19, command=ButtonEvents[x])))
+    ButtonList.append((ttk.Button(ButtonFrame, text=ButtonTexts[x], style="TButton", width=15, command=ButtonEvents[x])))
 
 #First row for labels
 for x in range(len(LabelTexts)):
@@ -366,9 +380,9 @@ else:RadioButtonList[2].invoke()
 #check button for data retrieving
 for x in range(11):
     if x<5:
-	    CheckButtonList.append(ttk.Checkbutton(CheckButtonFrame1, text=CheckButtonLabel[x], variable=CheckButtonValueList[x], onvalue=1, offvalue=0, width=10))
+	    CheckButtonList.append(ttk.Checkbutton(CheckButtonFrame1, text=CheckButtonLabel[x], variable=CheckButtonValueList[x], onvalue=1, offvalue=0, width=14))
     else:
-        CheckButtonList.append(ttk.Checkbutton(CheckButtonFrame2, text=CheckButtonLabel[x], variable=CheckButtonValueList[x], onvalue=1, offvalue=0, width=10))
+        CheckButtonList.append(ttk.Checkbutton(CheckButtonFrame2, text=CheckButtonLabel[x], variable=CheckButtonValueList[x], onvalue=1, offvalue=0, width=11))
 	
 		
 #Packing Stage
