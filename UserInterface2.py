@@ -47,7 +47,7 @@ Tab2=ttk.Frame(NoteBook)
 NoteBook.add(Tab1, text="Parameter")
 NoteBook.add(Tab2, text="Data")
 ConfigEntryFrame=ttk.Frame(Tab1, height=485)
-DataPresentationFrame=ttk.Frame(Tab1, height=485)
+DataPresentationFrame=ttk.Frame(Tab1, height=485, width=600)
 
 
 ButtonFrame=ttk.Frame(ConfigEntryFrame, height=30)#frame for buttons
@@ -64,6 +64,10 @@ CheckButtonFrame2=ttk.Frame(ConfigEntryFrame, height=40)
 
 
 
+DataPresLabelFrame=ttk.Frame(DataPresentationFrame, height=2)
+DataPresCellsFrameList=[]
+for x in range(10):
+	DataPresCellsFrameList.append(ttk.Frame(DataPresentationFrame, height=40))
 
 
 
@@ -73,11 +77,19 @@ ThrottleSide=tk.StringVar()
 ThrottleSide.set("L")
 CheckButtonValueList=[]
 CheckButtonValueBuf=[]
+
+DataPresCellsValues=[]
+
 for x in range(11):
 	CheckButtonValueList.append(tk.IntVar())
 	CheckButtonValueList[x].set(1)	
 	CheckButtonValueBuf.append(CheckButtonValueList[x].get())
 	print(type(CheckButtonValueBuf[x]))
+	
+#for x in range(len(CheckButtonLabel)):
+	#TmpList=[]
+	#for y in range(15):
+		#TmpList.
 	
 	
 ButtonList=[]#list for buttons
@@ -94,6 +106,9 @@ RadioButtonList=[]
 CheckButtonList=[]
 CheckButtonLabel=["pitch", "roll", "yaw", "atm", "height", "throt", "rot1", "rot2", "rot3", "rot4", "volt"]
 
+
+DataPresLabelList=[]
+DataPresCellsList=[]
 
 
 #Opening config file
@@ -160,10 +175,16 @@ file.write(TmpStr+'\n')
 
 
 
+
+
 #UDP sends data
+
+RecSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 def SendData(OriginalData=""):
+	global Port
+	
 	if len(OriginalData)==0:
-		Data1="@4:"
+		Data1="@6:"
 		for x in range(len(UpperCellValues)):
 			for y in range(len(UpperCellValues[x])):
 				Data1+=str(UpperCellValues[x][y])
@@ -172,8 +193,8 @@ def SendData(OriginalData=""):
 		Data1=Data1[:-1]
 		Data1+="#"
 		
-		Data2="@6:"
-		for x in range(len(LowerCellValues)):
+		Data2="@4:"
+		for x in range(len(LowerCellValues)-2):
 			Data2+=str(LowerCellValues[x])
 			Data2=Data2[:-1]
 			Data2+=":"
@@ -186,19 +207,31 @@ def SendData(OriginalData=""):
 		
 		
 	DstAddr=(IP, Port)
-	try:
+	CompleteFlag=0
+	
+	while CompleteFlag==0:
+		global RecSocketUdp	
+		Addr=('', Port)	
+		#try:
 		SendSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		SendSocketUdp.sendto(Data1.encode(), DstAddr)
+		print(Data1, Data2)
 		if len(Data2)>0:
-			SendSocketUdp.sendto(Data2.encode(), DstAddr)
-	except:
-		messagebox.showwarning("Quad Copter","Target IP not Available")
+			SendSocketUdp.sendto(Data2.encode(), DstAddr)		
+		RecSocketUdp.bind(Addr)
+		print(Addr, Port)
+		data=b''
+		data, (Addr, Port)=RecSocketUdp.recvfrom(512)
+		if data==b'@2@':CompleteFlag=1
+		#except:
+			#print("Hi there")
+			#messagebox.showwarning("Quad Copter","Target IP not Available")
+	messagebox.showwarning("Quadcopter", "Start Complete")
 
-SendData()
+#SendData()
 
 
 #UDP send/receive thread
-RecSocketUdp=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 class RecvDataThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)        
@@ -215,7 +248,7 @@ class RecvDataThread(threading.Thread):
             except:
                 None
                 print(1)		
-            SendData("@2:0:0.00:0.00:0.0#")
+            #SendData("@2:0:0.00:0.00:0.0#")
             time.sleep(0.01)
 			
 
@@ -226,27 +259,44 @@ def recv_data():
     global RecSocketUdp
     global SyncFlag
     try:
-    	Addr=('', Port)	
-    	data, (Addr, Port)=RecSocketUdp.recvfrom(512)
-    	if len(data)>0 and SyncFlag==0:
-        	print(data)
+        Addr=('', Port)
+        print(Addr, Port)
+        data, (Addr, Port)=RecSocketUdp.recvfrom(512)
+        if len(data)>0 and SyncFlag==0:
+            print(data)
         	#print(type(data))
-        	NewData=data.decode()
-        	NewData=NewData[1:-1]
-        	DevidedData=[]
-        	global file
-        	DevidedData=NewData.split(":")
-        	TmpStr=""
-        	for x in range(len(DevidedData)):
-                	if CheckButtonValueBuf[x]==1:
-                		TmpStr+=(DevidedData[x]+'\t')
+            NewData=data.decode()
+            NewData=NewData[1:-1]
+            DevidedData=[]
+            global file
+            DevidedData=NewData.split(":")
+            TmpStr=""
+            for x in range(len(DevidedData)):
+                if CheckButtonValueBuf[x]==1:
+                    TmpStr+=(DevidedData[x]+'\t')
                 		#TmpStr+=str(CheckButtonValueBuf[x])+'\t'
-        	TmpStr+='\n'
-        	file.write(TmpStr)
+            TmpStr+='\n'
+            file.write(TmpStr)
 		#print(time.ctime())
     except:
         None
 
+		
+		
+
+
+#Windows updating thread
+class WinUpdateThread(threading.Thread):
+	def __init__(self):
+		threading.Thread.__init__(self)
+
+	def run(self):
+		global Win
+		Win.update_idletasks()
+		sleep(0.5)
+	
+	
+	
 	
 	
 #Panel Appearance
@@ -384,9 +434,20 @@ for x in range(11):
     else:
         CheckButtonList.append(ttk.Checkbutton(CheckButtonFrame2, text=CheckButtonLabel[x], variable=CheckButtonValueList[x], onvalue=1, offvalue=0, width=11))
 	
-		
+	
+#data present page
+for x in range(len(CheckButtonLabel)):
+	DataPresLabelList.append(ttk.Label(DataPresLabelFrame, text=CheckButtonLabel[x], style="TLabel", width=6, relief="groove", anchor=LabelAllignment))
+	
+	
+	
+	
+	
 #Packing Stage
 ConfigEntryFrame.pack(side="left")
+DataPresentationFrame.pack(side="right")
+
+
 ButtonFrame.pack()
 EmptyFrame1.pack()
 LabelFrame.pack()
@@ -396,6 +457,12 @@ for x in range(len(LowerFrameList)):LowerFrameList[x].pack()#pakcing lower frame
 
 RadioButtonFrame.pack()
 
+DataPresLabelFrame.pack(side="top")
+
+for x in range(len(DataPresCellsFrameList)):
+	DataPresCellsFrameList[x].pack()
+
+	
 
 for x in range(len(ButtonList)): ButtonList[x].pack(side="left")#packing buttons
 
@@ -417,13 +484,23 @@ CheckButtonFrame2.pack()
 for x in range(len(CheckButtonLabel)):
 	CheckButtonList[x].pack(side="left")
 
+for x in range(len(CheckButtonLabel)):
+	DataPresLabelList[x].pack(side="left")
+	
+	
+	
 # create a new thread
 thread1=RecvDataThread()
+#thread2=WinUpdateThread()
 # start a new thread
 thread1.daemon=True
+#thread2.daemon=True
 thread1.start()
+#thread2.start()
 Win.mainloop()
+while 1:
+	Win.update()
 UIActiveFlag=False
-thread1.join()
+
 
 
