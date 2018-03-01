@@ -13,16 +13,15 @@ import os							#control command line
 
 
 #hold altitude flag
-AltFlag=0
 SyncFlag=0
-
+UIActiveFlag=True
 
 #define IP and Port
 IP="192.168.1.1"
 Port=239
+Addr=("192.168.1.1", 239)
 
 #inside config and flag
-UIActiveFlag=True
 ButtonAllignment="center"
 LabelAllignment="center"
 EntryAllignment="center"

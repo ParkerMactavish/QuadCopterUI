@@ -1,20 +1,26 @@
-import tkinter as tk
+from tkinter import Tk, Label, Button
 
-from time import sleep
+class MyFirstGUI:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("A simple GUI")
 
-root=tk.Tk()
+        self.label = Label(master, text="This is our first GUI!")
+        self.label.pack()
 
-LStr1=tk.StringVar()
-Label1=tk.Label(root, textvariable=LStr1)
+        self.greet_button = Button(master, text="Greet", command=self.greet)
+        self.greet_button.pack()
 
-Label1.pack()
+        self.close_button = Button(master, text="Close", command=master.quit)
+        self.close_button.pack()
 
-x=1
+    def greet(self):
+        print("Greetings!")
+	
+    def hi(self, master):
+        print(type(self.master), type(master))
 
-while 1:
-	x+=1
-	x%=1000
-	LStr1.set(str(x))
-	print(LStr1.get())
-	root.update()
-
+root = Tk()
+my_gui = MyFirstGUI(root)
+my_gui.hi(root)
+root.mainloop()
