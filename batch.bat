@@ -1,3 +1,3 @@
-%python% UI.py
+python UI.py
 
 Pause

@@ -13,15 +13,10 @@ import datetime
 import threading
 import os
 
-Flag={("Sync", False), ("UIActive", True), ("Connected", False)}
 
-Address=("192.168.1.1", 239)
-
-Socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-
-def Button_Trig_Send(Data, Button):
-	
+def Button_Trig_Send(Data, Msg):
+	TmpThread=Button_Send_Data_Thread(Data, Msg)
+	TmpThread.start()
 
 
 def Send_Data(Data):
@@ -58,19 +53,79 @@ def Open_Config(mode="r+"):
 	elif mode == "w":
 		ConfigFile=open("config.txt", mode)
 		return {"FileExist":True, "File":ConfigFile}
+
+		
+class Connect_Wifi_Thread(threading.Thread):
+	def __init__(self):
+		threading.Thread.__init__(self)
+	def run(self):
+		global Flag			
+		if (os.system("netsh wlan connect \"Quadcopter\""))==1:
+			messagebox.showwarning("Quadcopter", "Connection Error:\nCheck the connection between wi-fi \"Quadcopter\"")
+			Flag["Connected"]=False	
+			
+		while Flag["Connected"]==False and Flag["UIActive"]==True:
+			if (os.system("netsh wlan connect \"Quadcopter\""))==0:	
+				messagebox.showinfo("Quadcopter", "Regain Connection with Quad Copter")
+				Flag["Connected"]=True
+			time.sleep(1)
+
+			
+class Receive_Data_Thread(threading.Thread):
+	def __init__(self):
+		threading.Thread.__init__(self)
+	def run(self):
+		global DataFile
+		global UI1
+		global Flag
+		while Flag["UIActive"]==True:		
+			Data=Recieve_Data()
+			Data=Data[1:-1]
+			Data.split(":")
+			if len(Data)==11:
+				None
+			if Flag["Sync"]==False:				
+				CheckButtonCount=0
+				TmpStr=''
+				for x in UI1.CheckButtonDict:
+					if UI1.CheckButtonDict[x][1]==1:
+						TmpStr+=Data[CheckButtonCount]+'\t'
+					CheckButtonCount+=1
+				TmpStr+='\n'
+				DataFile.write(TmpStr)
+			
+			
+class Button_Send_Data_Thread(threading.Thread):
+	def __init__(self, Data, Msg):
+		threading.Thread.__init__(self)
+		self.Data=Data
+		self.TmpTime=time.monotonic()
+		self.ContinueFlag=True
+		self.Msg=Msg
+		
+	def run(self):
+		while self.ContinueFlag and time.monotonic()-self.TmpTime<4:
+			for x in range(len(self.Data)):
+				Send_Data(self.Data[x])
+			self.Ack=Recieve_Data()
+			if self.Ack=="@2@":self.ContinueFlag=False
+		
+		if self.ContinueFlag:messagebox.showwarning("Quadcopter", "Timed Out, Check Connection")
+		else: messagebox.showinfo("Quadcopter", self.Msg)
+		
 	
 
 class UI:
 	def __init__(self, master):		
 		self.Allignment={"Button": "center", "Label": "center", "Entry": "center", "RadioButton": "center", "CheckButton": "center"}
-
 		
 		#Panel Appearance
 		master.title("Quadcopter GUI")
 		master.grid_rowconfigure(0, weight=1)
 		master.grid_columnconfigure(0, weight=1)
-
-
+		
+		global DataFile
+		
 		#Styling
 		ttk.Style().configure("TButton", padding=5, background="#ccc",  anchor=self.Allignment["Button"])
 		ttk.Style().configure("TLabel", padding=3)
@@ -127,6 +182,8 @@ class UI:
 		else:
 			self.Save_File(Open_Config()["File"])
 		
+		for x in self.Get_Items():
+			DataFile.write(x+"\t")
 		
 		
 		self.DataPresDict=collections.OrderedDict([("pitch", [[], [], [], []]), ("roll", [[], [], [], []]), ("yaw", [[], [], [], []]), ("atm", [[], [], [], []]), ("height", [[], [], [], []]), ("throt", [[], [], [], []]), ("rot1", [[], [], [], []]), ("rot2", [[], [], [], []]), ("rot3", [[], [], [], []]), ("rot4", [[], [], [], []]), ("volt", [[], [], [], []])])
@@ -214,32 +271,59 @@ class UI:
 		
 
 	def Lock_Button(self):
-		Send_Data("@1:0#")
-		messagebox.showinfo("Quadcopter", "Quad Copter Locked")
+		global Flag
+		if Flag["Connected"]==False:
+			messagebox.showwarning("Quadcopter", "Check Wifi Connection.")
+		elif Flag["UDP"]==False:
+			messagebox.showwarning("Quadcopter", "Check UDP Transmission")
+		else:Button_Trig_Send(["@1:0#"], "Quad Copter Locked")
 		
 		
 	def Unlock_Button(self):
-		Send_Data("@1:1#")
-		messagebox.showinfo("Quadcopter", "Quad Copter Unlocked")
+		global Flag
+		if Flag["Connected"]==False:
+			messagebox.showwarning("Quadcopter", "Check Wifi Connection.")
+		elif Flag["UDP"]==False:
+			messagebox.showwarning("Quadcopter", "Check UDP Transmission")
+		else:Button_Trig_Send(["@1:1#"], "Quad Copter Unlocked")
 	
 	
 	def Sync_Button(self):
+		global Flag
+		global DataFile
 		Data=self.Save_File(Open_Config("w")["File"])
-		#while Recieve_Data()!="@2@":
-			#for x in range(len(Data)):
-				#Send_Data(Data[x])
-		messagebox.showinfo("Quadcopter", "Config Synchronized")
+		
+		
+		Flag["Sync"]=True
+		DataFile.close()
+		DataFile=open(str(Time.now().month).zfill(2)+"."+str(Time.now().day).zfill(2)+" "+str(Time.now().hour).zfill(2)+"-"+str(Time.now().minute).zfill(2)+"-"+str(Time.now().second).zfill(2)+".txt", "w")
+		for x in self.Get_Items():
+			DataFile.write(x+"\t")
+			
+		
+		Flag["Sync"]=False
+		if Flag["Connected"]==False:
+			messagebox.showwarning("Quadcopter", "Check Wifi Connection.")
+		elif Flag["UDP"]==False:
+			messagebox.showwarning("Quadcopter", "Check UDP Transmission")
+		else:Button_Trig_Send(Data, "Config Synchronized")
 	
 	def HoldAlt_Button(self):
-		#while Recieve_Data()!="@2@":
-			#Send_Data("@1:2#")
-		messagebox.showinfo("Quadcopter", "Altitude Held")
+		global Flag
+		if Flag["Connected"]==False:
+			messagebox.showwarning("Quadcopter", "Check Wifi Connection.")
+		elif Flag["UDP"]==False:
+			messagebox.showwarning("Quadcopter", "Check UDP Transmission")
+		else:Button_Trig_Send(["@1:2#"], "Altitude Held")
 		
 		
 	def UnholdAlt_Button(self):
-		#while Recieve_Data()!="@2@":
-			#Send_Data("@1:3#")
-		messagebox.showinfo("Quadcopter", "Altitude Hold Released")
+		global Flag
+		if Flag["Connected"]==False:
+			messagebox.showwarning("Quadcopter", "Check Wifi Connection.")
+		elif Flag["UDP"]==False:
+			messagebox.showwarning("Quadcopter", "Check UDP Transmission")
+		else:Button_Trig_Send(["@1:3#"], "Altitude Hold Released")
 		
 	
 	def Read_File(self, ConfigFile):		
@@ -290,10 +374,32 @@ class UI:
 			self.CheckButtonDict[x][1]=self.CheckButtonDict[x][0].get()
 			
 		return TmpStrList
+	def Get_Items(self):
+		Items=[]
+		for x in self.CheckButtonDict:
+			if(self.CheckButtonDict[x][1]==1):
+				Items.append(x)
+		return Items
+	
 
+Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False}
+
+Address=("192.168.1.1", 239)
+Socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+Time=datetime.datetime
+DataFile=open(str(Time.now().month).zfill(2)+"."+str(Time.now().day).zfill(2)+" "+str(Time.now().hour).zfill(2)+"-"+str(Time.now().minute).zfill(2)+"-"+str(Time.now().second).zfill(2)+".txt", "w")
+
+ConnectionThread=Connect_Wifi_Thread()
+ConnectionThread.start()
 
 root=Tk()
+root.deiconify()
 UI1=UI(root)
+
+RcvDataThread=Receive_Data_Thread()
+RcvDataThread.start()
+
 root.mainloop()
-
-
+Flag["UIActive"]=False
+print(Flag["UIActive"])
