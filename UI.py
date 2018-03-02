@@ -1,5 +1,5 @@
 from tkinter.ttk import Label, Button, Checkbutton, Entry, Radiobutton, Notebook, Frame
-from tkinter import Tk, Canvas, messagebox
+from tkinter import Tk, Canvas, messagebox, StringVar, IntVar
 import tkinter as tk
 import tkinter.ttk as ttk
 
@@ -17,109 +17,283 @@ Flag={("Sync", False), ("UIActive", True), ("Connected", False)}
 
 Address=("192.168.1.1", 239)
 
-class UI:
-	def __init__(self, master):
-		self.Allignment={"Button": "center", "Label": "center", "Entry": "center", "RadioButton": "center", "CheckButton": "center"}
-		
-		UpperCellValues=[[1,1,0,0],[1,1,0,0],[1.5,1,0,0],[0, 0, 0, 0],[1.5,0,0,0.01], [1.5,0,0,0.01], [1.5,0,0,0.01], [0,0,0,0]]
-		LowerCellValues=[1000, -4, 8, 2.5, 70]
-		self.ThrottleSide=tk.StringVar()
-		self.ThrottleSide.set("L")
-		CheckButtonValueList=[]
-		CheckButtonValueBuf=[]
+Socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+
+def Button_Trig_Send(Data, Button):
+	
+
+
+def Send_Data(Data):
+	global Address
+	global Socket
+	try:
+		Socket.sendto(Data.encode(), Address)
+		print(Data)
+	except:
+		print("Debug Send Data")
+
+def Recieve_Data():
+	global Address
+	global Socket
+	RecAddr=('', Address[1])
+	data=b''
+	try:
+		Socket.bind(RecAddr)
+		data, (RecAddr, Address[1])=Socket.recvfrom(512)
+	except:
+		None
+		
+	return data.decode()
+
+	
+		
+def Open_Config(mode="r+"):
+	if os.path.isfile("config.txt")==False:
+		ConfigFile=open("config.txt", "w")
+		return {"FileExist":False, "File":ConfigFile}
+	elif mode == "r+":
+		ConfigFile=open("config.txt", mode)
+		return {"FileExist":True, "File":ConfigFile}
+	elif mode == "w":
+		ConfigFile=open("config.txt", mode)
+		return {"FileExist":True, "File":ConfigFile}
+	
+
+class UI:
+	def __init__(self, master):		
+		self.Allignment={"Button": "center", "Label": "center", "Entry": "center", "RadioButton": "center", "CheckButton": "center"}
+
+		
 		#Panel Appearance
 		master.title("Quadcopter GUI")
 		master.grid_rowconfigure(0, weight=1)
 		master.grid_columnconfigure(0, weight=1)
-		
-		
+
+
 		#Styling
 		ttk.Style().configure("TButton", padding=5, background="#ccc",  anchor=self.Allignment["Button"])
 		ttk.Style().configure("TLabel", padding=3)
 		ttk.Style().configure("TEntry", padding=3)
 		ttk.Style().configure("TRadiobutton", padding=3, anchor=self.Allignment["RadioButton"])
 		ttk.Style().configure("TCheckbutton", padding=3, anchor=self.Allignment["CheckButton"])
-		
-		
+
+
 		#Creating Notebook on master
 		self.NoteBook=Notebook(master)
 		self.NoteBook.grid(sticky="NEWS")
-		
+
 		#Creating Frames on Tabs
 		self.ConfigTab=Frame(self.NoteBook)
-		self.ConfigTab.grid_columnconfigure(0, weight=1)
 		self.ControlTab=Frame(self.NoteBook)
 		self.NoteBook.add(self.ConfigTab, text="Configs")
 		self.NoteBook.add(self.ControlTab, text="Controls")
-		
-		
-		
-		#Creating List from widges
+
+
+
+		#Creating List from widgets
 		self.ButtonDict=collections.OrderedDict([("Lock", [self.Lock_Button]), ("Unlock", [self.Unlock_Button]), ("Sync", [self.Sync_Button]), ("HoldAlt", [self.HoldAlt_Button]), ("UnholdAlt", [self.UnholdAlt_Button])])#first for functions, second for buttons
+
+		
 		
 		self.UpperLabelDict=collections.OrderedDict([("PID", []), ("P", []), ("I", []), ("I Limit", []), ("D", [])])#first for widget
+
 		
-		self.UpperCells=collections.OrderedDict([("Attitude Roll",[[], [1, 1, 0, 0]]), ("Attitude Pitch",[[], [1, 1, 0, 0]]), ("Attitude Yaw",[[], [1.5, 1, 0, 0]]), ("Attitude Height", [[], [1, 0, 0, 0]]), ("Rate Roll",[[], [1.5, 0, 0, 0]]), ("Rate Pitch",[[], [1.5, 0, 0, 0.01]]), ("Rate Yaw",[[], [1.5, 0, 0, 0.01]]), ("Rate Height",[[], [1, 0, 0, 0]])])#first list for entries, second list for values
 		
-		self.LowerDict=collections.OrderedDict([("Angular Velocity Limit", [[], 1000]), ("Roll Angular Calibration", [[], -4]), ("Pitch Angular Calibration", [[], 8]), ("Stick Gain", [[], 2.5]), ("Max Throttle Percentage", [[], 70])])#first list for labels and entries, second value for values
+		self.UpperCells=collections.OrderedDict([("Attitude Roll",[[], ["1", "1", "0", "0"]]), ("Attitude Pitch",[[], ["1", "1", "0", "0"]]), ("Attitude Yaw",[[], ["1.5", "1", "0", "0"]]), ("Attitude Height", [[], ["1", "0", "0", "0"]]), ("Rate Roll",[[], ["1.5", "0", "0", "0"]]), ("Rate Pitch",[[], ["1.5", "0", "0", "0.01"]]), ("Rate Yaw",[[], ["1.5", "0", "0", "0.01"]]), ("Rate Height",[[], ["1", "0", "0", "0"]])])#first list for entries, second list for values
+
 		
-		self.RadioButtonRow=[]
+		
+		self.LowerDict=collections.OrderedDict([("Angular Velocity Limit", [[], "1000"]), ("Roll Angular Calibration", [[], "-4"]), ("Pitch Angular Calibration", [[], "8"]), ("Stick Gain", [[], "2.5"]), ("Max Throttle Percentage", [[], "70"])])#first list for labels and entries, second value for values
+
+		
+		
+		self.ThrottleRow=[]#first for StrVar, second for widgets
+		self.ThrottleRow.append(StringVar())
+		self.ThrottleRow[0].set("L")
+
+		
 		
 		self.CheckButtonDict=collections.OrderedDict([("pitch", []), ("roll", []), ("yaw", []), ("atm", []), ("height", []), ("throt", []), ("rot1", []), ("rot2", []), ("rot3", []), ("rot4", []), ("volt", [])])
-		#first for check button, second for int var, third for buffer int
+		#first for int var, second for buffer int, third for check button
+		for x in self.CheckButtonDict:
+			self.CheckButtonDict[x].append(IntVar())
+			self.CheckButtonDict[x][0].set(0)
+			self.CheckButtonDict[x].append(self.CheckButtonDict[x][0].get())
+		
+
+		if(Open_Config()["FileExist"]):
+			self.Read_File(Open_Config()["File"])		
+		else:
+			self.Save_File(Open_Config()["File"])
+		
+		
 		
 		self.DataPresDict=collections.OrderedDict([("pitch", [[], [], [], []]), ("roll", [[], [], [], []]), ("yaw", [[], [], [], []]), ("atm", [[], [], [], []]), ("height", [[], [], [], []]), ("throt", [[], [], [], []]), ("rot1", [[], [], [], []]), ("rot2", [[], [], [], []]), ("rot3", [[], [], [], []]), ("rot4", [[], [], [], []]), ("volt", [[], [], [], []])])
 		#first for label, second for following labels third for int var, fourth for buffer int
+
 		
-		ColumnCounter=0
+		
+		self.ColumnCounter=0
 		#Buttons
 		for x in self.ButtonDict:
 			self.ButtonDict[x].append(Button(self.ConfigTab, text=x, style="TButton", command=self.ButtonDict[x][0]))
-			self.ButtonDict[x][1].grid(row=0, column=ColumnCounter*2, columnspan=2, sticky="NEWS")
-			ColumnCounter+=1
-		
-		
-		ColumnCounter=0
+			self.ButtonDict[x][1].grid(row=0, column=self.ColumnCounter*6, columnspan=6, sticky="NEWS")
+			self.ColumnCounter+=1
+
+			
+			
+
+		self.ColumnCounter=0
 		#Upper Labels
 		for x in self.UpperLabelDict:
 			self.UpperLabelDict[x].append(Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"]))
-			self.UpperLabelDict[x][0].grid(row=1, column=ColumnCounter*2, columnspan=2, sticky="NEWS")
-			ColumnCounter+=1
+			self.UpperLabelDict[x][0].grid(row=1, column=self.ColumnCounter*6, columnspan=6, sticky="NEWS")
+			self.ColumnCounter+=1
+
+
 			
-		
-		RowCounter=2
+			
+		self.RowCounter=2
 		#Upper Cells
 		for x in self.UpperCells:
-			ColumnCounter=0
+			self.ColumnCounter=0
 			self.UpperCells[x][0].append(Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"]))
-			self.UpperCells[x][0][0].grid(row=RowCounter, column=ColumnCounter*2, columnspan=2, sticky="NEWS")
-			ColumnCounter+=1
+			self.UpperCells[x][0][0].grid(row=self.RowCounter, column=self.ColumnCounter*6, columnspan=6, sticky="NEWS")
+			self.ColumnCounter+=1
 			for y in range(4):
-				self.UpperCells[x][0].append(Entry(self.ConfigTab, style="TEntry", justify=self.self.Allignment["Entry"]))
+				self.UpperCells[x][0].append(Entry(self.ConfigTab, style="TEntry", justify=self.Allignment["Entry"]))
 				self.UpperCells[x][0][y+1].insert("end", self.UpperCells[x][1][y])
-				self.UpperCells[x][0][y+1].grid(row=RowCounter, column=ColumnCounter*2, columnspan=2, sticky="NEWS")
-				ColumnCounter+=1
-			RowCounter+=1
+				self.UpperCells[x][0][y+1].grid(row=self.RowCounter, column=self.ColumnCounter*6, columnspan=6, sticky="NEWS")
+				self.ColumnCounter+=1
+			self.RowCounter+=1
+
+			
+			
+		#Lower Cells
+		for x in self.LowerDict:
+			self.LowerDict[x][0].append(Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"]))
+			self.LowerDict[x][0].append(Entry(self.ConfigTab, style="TEntry", justify=self.Allignment["Entry"]))
+			self.LowerDict[x][0][0].grid(row=self.RowCounter, column=0, columnspan=15, sticky="NEWS")
+			self.LowerDict[x][0][1].insert("end", self.LowerDict[x][1])
+			self.LowerDict[x][0][1].grid(row=self.RowCounter, column=15, columnspan=15, sticky="NEWS")
+			self.RowCounter+=1
+
+
+			
+			
+		#Radio Button
+		self.ThrottleRow.append(Label(self.ConfigTab, text="Throttle Side", style="TLabel", relief="groove", anchor=self.Allignment["Label"]))
+		self.ThrottleRow.append(Radiobutton(self.ConfigTab, text="Left", style="TRadiobutton", variable=self.ThrottleRow[0], value="L"))
+		self.ThrottleRow.append(Radiobutton(self.ConfigTab, text="Right", style="TRadiobutton", variable=self.ThrottleRow[0], value="R"))
+		if "L" ==self.ThrottleRow[0].get():self.ThrottleRow[2].invoke()
+		else:self.ThrottleRow[3].invoke()
+		self.ThrottleRow[1].grid(row=self.RowCounter, column=0, columnspan=10, sticky="NEWS")
+		self.ThrottleRow[2].grid(row=self.RowCounter, column=10, columnspan=10, sticky="NEWS")
+		self.ThrottleRow[3].grid(row=self.RowCounter, column=20, columnspan=10, sticky="NEWS")
+		self.RowCounter+=1
+
 		
+		
+		#Check Buttons
+		self.CheckButtonCount=0
+		for x in self.CheckButtonDict:
+			self.CheckButtonDict[x].append(Checkbutton(self.ConfigTab, text=x, variable=self.CheckButtonDict[x][0], onvalue=1, offvalue=0))
+			if self.CheckButtonCount<6:
+				self.CheckButtonDict[x][2].grid(row=self.RowCounter, column=self.CheckButtonCount*5, columnspan=5, sticky="NEWS")
+			else:			
+				self.CheckButtonDict[x][2].grid(row=self.RowCounter+1, column=(self.CheckButtonCount-6)*5, columnspan=5, sticky="NEWS")
+			self.CheckButtonCount+=1
+			
+		self.RowCounter+=2	
+		
+		
+		for x in range(30):self.ConfigTab.grid_columnconfigure(x, weight=1)
+		for x in range(self.RowCounter):self.ConfigTab.grid_rowconfigure(x, weight=1)
+	
 		
 
 	def Lock_Button(self):
-		pass
-	def Unlock_Button(self):
-		pass
-	def Sync_Button(self):
-		pass
-	def HoldAlt_Button(self):
-		pass
-	def UnholdAlt_Button(self):
-		pass
-
+		Send_Data("@1:0#")
+		messagebox.showinfo("Quadcopter", "Quad Copter Locked")
 		
+		
+	def Unlock_Button(self):
+		Send_Data("@1:1#")
+		messagebox.showinfo("Quadcopter", "Quad Copter Unlocked")
+	
+	
+	def Sync_Button(self):
+		Data=self.Save_File(Open_Config("w")["File"])
+		#while Recieve_Data()!="@2@":
+			#for x in range(len(Data)):
+				#Send_Data(Data[x])
+		messagebox.showinfo("Quadcopter", "Config Synchronized")
+	
+	def HoldAlt_Button(self):
+		#while Recieve_Data()!="@2@":
+			#Send_Data("@1:2#")
+		messagebox.showinfo("Quadcopter", "Altitude Held")
+		
+		
+	def UnholdAlt_Button(self):
+		#while Recieve_Data()!="@2@":
+			#Send_Data("@1:3#")
+		messagebox.showinfo("Quadcopter", "Altitude Hold Released")
+		
+	
+	def Read_File(self, ConfigFile):		
+		for x in self.UpperCells:
+			for y in range(len(self.UpperCells[x][1])):
+				TmpStr=ConfigFile.readline()
+				self.UpperCells[x][1][y]=TmpStr[:-1]
+				
+		for x in self.LowerDict:
+			TmpStr=ConfigFile.readline()
+			self.LowerDict[x][1]=TmpStr[:-1]
+			
+		TmpStr=ConfigFile.readline()
+		self.ThrottleRow[0].set(TmpStr[:-1])
+			
+		for x in self.CheckButtonDict:
+			TmpStr=ConfigFile.readline()
+			self.CheckButtonDict[x][0].set(int(TmpStr[:-1]))
+			self.CheckButtonDict[x][1]=self.CheckButtonDict[x][0].get()
+			
+			
+	def Save_File(self, ConfigFile):
+		TmpStrList=["@6:", "@4:"]
+		for x in self.UpperCells:
+			for y in range(len(self.UpperCells[x][1])):
+				self.UpperCells[x][1][y]=self.UpperCells[x][0][y+1].get()
+				ConfigFile.write(self.UpperCells[x][1][y]+'\n')
+				TmpStrList[0]+=self.UpperCells[x][1][y]+":"
+		TmpStrList[0]=TmpStrList[0][:-1]
+		TmpStrList[0]+="#"
+		
+		
+		TmpCnt=0
+		for x in self.LowerDict:
+			self.LowerDict[x][1]=self.LowerDict[x][0][1].get()
+			ConfigFile.write(self.LowerDict[x][1]+'\n')
+			if TmpCnt<len(self.LowerDict)-2:
+				TmpStrList[1]+=self.LowerDict[x][1]+":"
+				TmpCnt+=1
+		TmpStrList[1]=TmpStrList[1][:-1]
+		TmpStrList[1]+="#"
+				
+			
+		ConfigFile.write(self.ThrottleRow[0].get()+'\n')
+			
+		for x in self.CheckButtonDict:
+			ConfigFile.write(str(self.CheckButtonDict[x][0].get())+'\n')
+			self.CheckButtonDict[x][1]=self.CheckButtonDict[x][0].get()
+			
+		return TmpStrList
+
 
 root=Tk()
 UI1=UI(root)
 root.mainloop()
-		
-		
-		
+
+
