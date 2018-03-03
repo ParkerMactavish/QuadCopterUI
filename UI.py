@@ -227,9 +227,35 @@ class UI:
 				self.DataPresDict[x][2].append(IntVar(0))
 					
 		
-		self.ThrottleCanvas=Canvas(self.ControlTab)
-		self.ThrottleCanvas.create_oval(5, 5, 100, 100, fill="blue")
-		self.ThrottleCanvas.grid()
+		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="sunken")
+		self.ThrottleCanvas.bind('<B1-Motion>', self.Get_Throttle)
+		self.ThrottleCanvas.bind('<ButtonRelease-1>', self.Reset_Throttle)
+		self.ThrottleCanvas.bind('<Key>', self.Get_Direction)
+		self.ThrottleBall=self.ThrottleCanvas.create_oval(50, 400, 150, 500, fill="blue", tag='Ball')
+		self.ThrottleCanvas.grid(column=0, row=0, columnspan=2)
+		self.ThrottleBallPos={'Origin':[100, 450], 'Current':[100, 450]}
+		
+		
+		self.DataCanvasBuffer=[[], [], [], [], [], [], [], [], [], [], [], []]
+		self.DataCanvas=Canvas(self.ControlTab, width=1100, height=600)
+		self.DataCanvas.grid(column=2, row=0, rowspan=5)
+		
+		
+		self.ControlPres={"Throttle":[], "Roll":[], "Pitch":[], "Yaw":[]}
+		RowCounter=1
+		for x in self.ControlPres:
+			self.ControlPres[x].append(StringVar())
+			self.ControlPres[x][0].set("0")
+			self.ControlPres[x].append(Label(self.ControlTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"], width=16))
+			self.ControlPres[x][1].grid(column=0, row=RowCounter)
+			self.ControlPres[x].append(Label(self.ControlTab, textvariable=self.ControlPres[x][0], style="TLabel", relief="groove", anchor=self.Allignment["Label"], width=16))
+			self.ControlPres[x][2].grid(column=1, row=RowCounter)
+			RowCounter+=1
+			
+			
+		for x in range(3):self.ControlTab.grid_columnconfigure(x, weight=1)
+		for x in range(5):self.ControlTab.grid_rowconfigure(x, weight=1)
+			
 		
 		
 		
@@ -427,13 +453,43 @@ class UI:
 			self.CheckButtonDict[x][1]=self.CheckButtonDict[x][0].get()
 			
 		return TmpStrList
+		
+		
 	def Get_Items(self):
 		Items=[]
 		for x in self.CheckButtonDict:
 			if(self.CheckButtonDict[x][1]==1):
 				Items.append(x)
 		return Items
+		
+	def Get_Throttle(self, event):
+		if event.x>=0 and event.x<=self.ThrottleCanvas.winfo_width() and event.y >=0 and event.y<=self.ThrottleCanvas.winfo_height():
+			Diff=[event.x-self.ThrottleBallPos['Current'][0], event.y-self.ThrottleBallPos['Current'][1]]
+			self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
+			self.ThrottleBallPos['Current']=[event.x, event.y]
+			
+		else:
+			Diff=[self.ThrottleBallPos['Origin'][0]-self.ThrottleBallPos['Current'][0], self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1]]
+			self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
+			self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
+		print(self.ThrottleBallPos, Diff)
 	
+	def Reset_Throttle(self, event):
+		Diff=[self.ThrottleBallPos['Origin'][0]-self.ThrottleBallPos['Current'][0], self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1]]
+		self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
+		self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
+		
+	def Get_Direction(self, event):
+		if event.keycode==38 or event.char=='w':
+			print("Forward")
+		elif event.keycode==40 or event.char=='s':
+			print("Backward")
+		elif event.keycode==37 or event.char=='a':
+			self.ControlPres
+		elif event.keycode==39 or event.char=='d':
+			print("Right")	
+			
+		
 
 Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False, "DataPres":0}
 

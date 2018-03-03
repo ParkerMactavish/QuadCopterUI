@@ -1,7 +1,7 @@
 from tkinter import *
 import time
 
-trace = 0 
+trace = 1 
 
 class CanvasEventsDemo: 
     def __init__(self, parent=None):
