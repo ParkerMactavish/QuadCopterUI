@@ -28,6 +28,7 @@ def Send_Data(Data):
 	except:
 		print("Debug Send Data")
 
+
 def Recieve_Data():
 	global Address
 	global Socket
@@ -35,10 +36,14 @@ def Recieve_Data():
 	data=b''
 	try:
 		Socket.bind(RecAddr)
-		data, (RecAddr, Address[1])=Socket.recvfrom(512)
 	except:
-		None
-		
+		print("Debug Socket Bind")
+	
+	try:
+		Socket.settimeout(3.0)
+		data, (RecAddr, Address[1])=Socket.recvfrom(512)
+	except:		
+		print("Debug Recv Data")
 	return data.decode()
 
 	
@@ -62,14 +67,16 @@ class Connect_Wifi_Thread(threading.Thread):
 		global Flag			
 		if (os.system("netsh wlan connect \"Quadcopter\""))==1:
 			messagebox.showwarning("Quadcopter", "Connection Error:\nCheck the connection between wi-fi \"Quadcopter\"")
-			Flag["Connected"]=False	
+		else:Flag["Connected"]=True	
 			
 		while Flag["Connected"]==False and Flag["UIActive"]==True:
+			time.sleep(1)
 			if (os.system("netsh wlan connect \"Quadcopter\""))==0:	
 				messagebox.showinfo("Quadcopter", "Regain Connection with Quad Copter")
 				Flag["Connected"]=True
-			time.sleep(1)
-
+		print("Exit Connecting Thread")
+		
+		
 			
 class Receive_Data_Thread(threading.Thread):
 	def __init__(self):
@@ -78,13 +85,34 @@ class Receive_Data_Thread(threading.Thread):
 		global DataFile
 		global UI1
 		global Flag
-		while Flag["UIActive"]==True:		
+		while Flag["UIActive"]:
 			Data=Recieve_Data()
-			Data=Data[1:-1]
-			Data.split(":")
-			if len(Data)==11:
-				None
-			if Flag["Sync"]==False:				
+			if len(Data)>2:
+				Data=Data[1:-1]
+				Data.split(":")
+				Flag["UDP"]=True
+			else:Flag["UDP"]=False
+			
+			
+			if len(Data)==len(UI1.DataPresDict):
+				if Flag["DataPres"]!=UI1.RowCounter-1:
+					TmpCnt=0
+					for x in UI1.DataPresDict:
+						UI1.DataPresDict[x][2][Flag["DataPres"]].set(Data[TmpCnt])
+						TmpCnt+=1
+						
+					Flag["DataPres"]+=1
+					
+				else:
+					TmpCnt=0
+					for x in UI1.DataPresDict:
+						for y in range(Flag["DataPres"]-2):
+							UI1.DataPresDict[x][2][y].set(UI1.DataPresDict[x][2][y+1].get())
+						UI1.DataPresDict[x][2][Flag["DataPres"]-1].set(Data[TmpCnt])
+						TmpCnt+=1
+			
+			
+			if Flag["Sync"]==False and len(Data)==11:				
 				CheckButtonCount=0
 				TmpStr=''
 				for x in UI1.CheckButtonDict:
@@ -93,7 +121,8 @@ class Receive_Data_Thread(threading.Thread):
 					CheckButtonCount+=1
 				TmpStr+='\n'
 				DataFile.write(TmpStr)
-			
+		print("Exit Receiving Thread")
+		
 			
 class Button_Send_Data_Thread(threading.Thread):
 	def __init__(self, Data, Msg):
@@ -104,13 +133,15 @@ class Button_Send_Data_Thread(threading.Thread):
 		self.Msg=Msg
 		
 	def run(self):
-		while self.ContinueFlag and time.monotonic()-self.TmpTime<4:
+		self.TimeOutDuration=3
+		while self.ContinueFlag and time.monotonic()-self.TmpTime<self.TimeOutDuration:
 			for x in range(len(self.Data)):
 				Send_Data(self.Data[x])
 			self.Ack=Recieve_Data()
+			print(self.Ack)
 			if self.Ack=="@2@":self.ContinueFlag=False
 		
-		if self.ContinueFlag:messagebox.showwarning("Quadcopter", "Timed Out, Check Connection")
+		if self.ContinueFlag:messagebox.showwarning("Quadcopter", "Timed Out, Check UDP Connection")
 		else: messagebox.showinfo("Quadcopter", self.Msg)
 		
 	
@@ -186,11 +217,23 @@ class UI:
 			DataFile.write(x+"\t")
 		
 		
-		self.DataPresDict=collections.OrderedDict([("pitch", [[], [], [], []]), ("roll", [[], [], [], []]), ("yaw", [[], [], [], []]), ("atm", [[], [], [], []]), ("height", [[], [], [], []]), ("throt", [[], [], [], []]), ("rot1", [[], [], [], []]), ("rot2", [[], [], [], []]), ("rot3", [[], [], [], []]), ("rot4", [[], [], [], []]), ("volt", [[], [], [], []])])
-		#first for label, second for following labels third for int var, fourth for buffer int
-
 		
 		
+		self.DataPresDict=collections.OrderedDict([("pitch", [[], [], []]), ("roll", [[], [], []]), ("yaw", [[], [], []]), ("atm", [[], [], []]), ("height", [[], [], []]), ("throt", [[], [], []]), ("rot1", [[], [], []]), ("rot2", [[], [], []]), ("rot3", [[], [], []]), ("rot4", [[], [], []]), ("volt", [[], [], []])])
+		#first for label, second for following labels third for int var
+		
+		for x in self.DataPresDict:
+			for y in range(18):
+				self.DataPresDict[x][2].append(IntVar(0))
+					
+		
+		self.ThrottleCanvas=Canvas(self.ControlTab)
+		self.ThrottleCanvas.create_oval(5, 5, 100, 100, fill="blue")
+		self.ThrottleCanvas.grid()
+		
+		
+		
+		#Widgets and Griding
 		self.ColumnCounter=0
 		#Buttons
 		for x in self.ButtonDict:
@@ -265,9 +308,19 @@ class UI:
 		self.RowCounter+=2	
 		
 		
-		for x in range(30):self.ConfigTab.grid_columnconfigure(x, weight=1)
+		#Data Presenting Labels
+		self.ColumnCounter=30
+		for x in self.DataPresDict:
+			self.DataPresDict[x][0].append(Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"], width=7))
+			self.DataPresDict[x][0][0].grid(row=0, column=self.ColumnCounter, columnspan=1, sticky="NEWS")			
+			for y in range(self.RowCounter-1):
+				self.DataPresDict[x][1].append(Label(self.ConfigTab, textvariable=self.DataPresDict[x][2][y], style="TLabel", relief="groove", anchor=self.Allignment["Label"], width=7))
+				self.DataPresDict[x][1][y].grid(row=y+1, column=self.ColumnCounter, columnspan=1, sticky="NEWS")
+			self.ColumnCounter+=1
+		
+		
+		for x in range(self.ColumnCounter):self.ConfigTab.grid_columnconfigure(x, weight=1)
 		for x in range(self.RowCounter):self.ConfigTab.grid_rowconfigure(x, weight=1)
-	
 		
 
 	def Lock_Button(self):
@@ -382,7 +435,7 @@ class UI:
 		return Items
 	
 
-Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False}
+Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False, "DataPres":0}
 
 Address=("192.168.1.1", 239)
 Socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -390,16 +443,15 @@ Socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 Time=datetime.datetime
 DataFile=open(str(Time.now().month).zfill(2)+"."+str(Time.now().day).zfill(2)+" "+str(Time.now().hour).zfill(2)+"-"+str(Time.now().minute).zfill(2)+"-"+str(Time.now().second).zfill(2)+".txt", "w")
 
-ConnectionThread=Connect_Wifi_Thread()
-ConnectionThread.start()
-
 root=Tk()
-root.deiconify()
-UI1=UI(root)
+
+ConnectionThread=Connect_Wifi_Thread()
+#ConnectionThread.start()
 
 RcvDataThread=Receive_Data_Thread()
-RcvDataThread.start()
+#RcvDataThread.start()
 
+root.deiconify()
+UI1=UI(root)
 root.mainloop()
 Flag["UIActive"]=False
-print(Flag["UIActive"])

@@ -107,9 +107,9 @@ class PageThree(tk.Frame):
         button1.pack()
 
         f = Figure(figsize=(5,5), dpi=100)
-        a = f.add_subplot(111)
-        a.plot([1,2,3,4,5,6,7,8, 9, 10, 11],[5,6,1,3,8,9,3,50, 0, 0, 0])
-
+        f.add_subplot(111).plot([1,2,3,4,5,6,7,8, 9, 10, 11],[5,6,1,3,8,9,3,50, 0, 0, 0])
+		
+        f.add_subplot(111).plot([1,2,3,4,5,6,7,8, 9, 10, 11],[5,6,1,3,8,9,3,50, 0, 4, 1])
         
 
         canvas = FigureCanvasTkAgg(f, self)
