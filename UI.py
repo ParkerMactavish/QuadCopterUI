@@ -13,6 +13,9 @@ import datetime
 import threading
 import os
 
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 
 def Button_Trig_Send(Data, Msg):
 	TmpThread=Button_Send_Data_Thread(Data, Msg)
@@ -227,7 +230,7 @@ class UI:
 				self.DataPresDict[x][2].append(IntVar(0))
 					
 		
-		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="sunken")
+		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="groove", bg="#fff", bd=3)
 		self.ThrottleCanvas.bind('<B1-Motion>', self.Get_Throttle)
 		self.ThrottleCanvas.bind('<ButtonRelease-1>', self.Reset_Throttle)
 		self.ThrottleCanvas.bind('<Key>', self.Get_Direction)
@@ -236,9 +239,18 @@ class UI:
 		self.ThrottleBallPos={'Origin':[100, 450], 'Current':[100, 450]}
 		
 		
+		
 		self.DataCanvasBuffer=[[], [], [], [], [], [], [], [], [], [], [], []]
-		self.DataCanvas=Canvas(self.ControlTab, width=1100, height=600)
-		self.DataCanvas.grid(column=2, row=0, rowspan=5)
+		
+		
+		self.DataFigure=Figure(figsize=(11, 5), dpi=100)
+		for x in range(len(self.DataCanvasBuffer)-1):
+			self.DataFigure.add_subplot(111).plot(self.DataCanvasBuffer[0], self.DataCanvasBuffer[x+1])
+			
+		self.DataCanvas = FigureCanvasTkAgg(self.DataFigure, self.ControlTab)
+		self.DataCanvas.show()
+		self.DataCanvas.get_tk_widget().grid(column=2, row=0, rowspan=5)
+		
 		
 		
 		self.ControlPres={"Throttle":[], "Roll":[], "Pitch":[], "Yaw":[]}
