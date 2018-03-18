@@ -4,7 +4,8 @@ root = Tk()
 
 def key(event):
 	print(event.keycode)
-	print ("pressed", event.char)
+	if event.char=='w':
+		print("forward")
 
 def callback(event):
 	global frame
@@ -14,7 +15,7 @@ def callback(event):
 		print(frame.winfo_width())
 
 frame = Frame(root,width=100, height=100, relief="groove")
-frame.bind("<Key>", key)
+root.bind("<Key>", key)
 frame.bind("<B1-Motion>", callback)
 frame.grid()
 root.grid_columnconfigure(0, weight=1)

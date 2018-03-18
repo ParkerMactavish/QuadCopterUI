@@ -62,6 +62,21 @@ def Open_Config(mode="r+"):
 		ConfigFile=open("config.txt", mode)
 		return {"FileExist":True, "File":ConfigFile}
 
+
+class Throttle_Send_Data_Thread(threading.Thread):
+	def __init__(self):
+		threading.Thread.__init__(self)
+		
+	def run(self):
+		global UI1
+		while Flag["UIActive"]:
+			data="@2"
+			for x in UI1.ControlPres:
+				data+=':'+UI1.ControlPres[x][0].get()
+			data+='#'
+			print(data)
+			Send_Data(data)
+
 		
 class Connect_Wifi_Thread(threading.Thread):
 	def __init__(self):
@@ -228,13 +243,17 @@ class UI:
 		for x in self.DataPresDict:
 			for y in range(18):
 				self.DataPresDict[x][2].append(IntVar(0))
+				
 					
 		
-		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="groove", bg="#fff", bd=3)
+		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="groove", bg="#fff", bd=3)		
+		master.bind("<Key>", self.Get_Direction)
 		self.ThrottleCanvas.bind('<B1-Motion>', self.Get_Throttle)
+		self.ThrottleCanvas.bind('<Button-1>', self.Get_Throttle)
 		self.ThrottleCanvas.bind('<ButtonRelease-1>', self.Reset_Throttle)
-		self.ThrottleCanvas.bind('<Key>', self.Get_Direction)
 		self.ThrottleBall=self.ThrottleCanvas.create_oval(50, 400, 150, 500, fill="blue", tag='Ball')
+		self.ThrottleCanvas.create_line(75, 0, 75, 500)
+		self.ThrottleCanvas.create_line(125, 0, 125, 500)
 		self.ThrottleCanvas.grid(column=0, row=0, columnspan=2)
 		self.ThrottleBallPos={'Origin':[100, 450], 'Current':[100, 450]}
 		
@@ -480,26 +499,42 @@ class UI:
 			self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
 			self.ThrottleBallPos['Current']=[event.x, event.y]
 			
-		else:
-			Diff=[self.ThrottleBallPos['Origin'][0]-self.ThrottleBallPos['Current'][0], self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1]]
-			self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
-			self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
-		print(self.ThrottleBallPos, Diff)
+		#else:
+			#Diff=[0, 0]
+			#self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
+			#self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
+			
+		if (self.ThrottleBallPos['Current'][1]-self.ThrottleBallPos['Origin'][1])<=0:
+			self.ControlPres['Throttle'][0].set(int((self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1])*int(self.LowerDict['Max Throttle Percentage'][1])/450))
+			
+		if (self.ThrottleBallPos['Current'][0]-self.ThrottleBallPos['Origin'][0])>25:
+			self.ControlPres['Yaw'][0].set(1)		
+		elif (self.ThrottleBallPos['Current'][0]-self.ThrottleBallPos['Origin'][0])<-25:
+			self.ControlPres['Yaw'][0].set(-1)			
+		else:self.ControlPres['Yaw'][0].set(0)
+		
+		#print(self.ThrottleBallPos, Diff)
 	
 	def Reset_Throttle(self, event):
 		Diff=[self.ThrottleBallPos['Origin'][0]-self.ThrottleBallPos['Current'][0], self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1]]
 		self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
 		self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
+		self.ControlPres['Throttle'][0].set(0)
+		self.ControlPres['Yaw'][0].set(0)
 		
 	def Get_Direction(self, event):
 		if event.keycode==38 or event.char=='w':
-			print("Forward")
+			if self.ControlPres['Pitch'][0].get()[0]=='-':self.ControlPres['Pitch'][0].set(0)
+			else:self.ControlPres['Pitch'][0].set(1*self.LowerDict['Stick Gain'][1])
 		elif event.keycode==40 or event.char=='s':
-			print("Backward")
-		elif event.keycode==37 or event.char=='a':
-			self.ControlPres
-		elif event.keycode==39 or event.char=='d':
-			print("Right")	
+			if self.ControlPres['Pitch'][0].get()[0]!='0' and self.ControlPres['Pitch'][0].get()[0]!='-':self.ControlPres['Pitch'][0].set(0)
+			else:self.ControlPres['Pitch'][0].set("-"+str(1*self.LowerDict['Stick Gain'][1]))
+		elif event.keycode==37 or event.char=='d':
+			if self.ControlPres['Roll'][0].get()[0]=='-':self.ControlPres['Roll'][0].set(0)
+			else:self.ControlPres['Roll'][0].set(1*self.LowerDict['Stick Gain'][1])
+		elif event.keycode==39 or event.char=='a':
+			if self.ControlPres['Roll'][0].get()[0]!='0' and self.ControlPres['Roll'][0].get()[0]!='-':self.ControlPres['Roll'][0].set(0)
+			else:self.ControlPres['Roll'][0].set("-"+str(1*self.LowerDict['Stick Gain'][1]))
 			
 		
 
@@ -512,6 +547,9 @@ Time=datetime.datetime
 DataFile=open(str(Time.now().month).zfill(2)+"."+str(Time.now().day).zfill(2)+" "+str(Time.now().hour).zfill(2)+"-"+str(Time.now().minute).zfill(2)+"-"+str(Time.now().second).zfill(2)+".txt", "w")
 
 root=Tk()
+root.deiconify()
+UI1=UI(root)
+
 
 ConnectionThread=Connect_Wifi_Thread()
 #ConnectionThread.start()
@@ -519,7 +557,9 @@ ConnectionThread=Connect_Wifi_Thread()
 RcvDataThread=Receive_Data_Thread()
 #RcvDataThread.start()
 
-root.deiconify()
-UI1=UI(root)
+ThroSendDataThread=Throttle_Send_Data_Thread()
+ThroSendDataThread.start()
+
+
 root.mainloop()
 Flag["UIActive"]=False
