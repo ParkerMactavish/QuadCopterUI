@@ -34,13 +34,15 @@ def Send_Data(Data):
 
 def Recieve_Data():
 	global Address
+	RecAddr=('', 239)	
 	global Socket
-	RecAddr=('', Address[1])
+	Socket.bind(RecAddr)
+	print(RecAddr)
 	data=b''
-	try:
-		Socket.bind(RecAddr)
-	except:
-		print("Debug Socket Bind")
+	#try:
+	Socket.bind(RecAddr)
+	#except:
+	#	print("Debug Socket Bind")
 	
 	try:
 		Socket.settimeout(3.0)
@@ -69,13 +71,18 @@ class Throttle_Send_Data_Thread(threading.Thread):
 		
 	def run(self):
 		global UI1
+		global Flag
 		while Flag["UIActive"]:
-			data="@2"
-			for x in UI1.ControlPres:
-				data+=':'+UI1.ControlPres[x][0].get()
-			data+='#'
-			print(data)
-			Send_Data(data)
+			if Flag["SocketUsage"]=="Send Normal":
+				data="@2"
+				for x in UI1.ControlPres:
+					data+=':'+UI1.ControlPres[x][0].get()
+				data+='#'
+				time.sleep(0.05)
+				#print(data)
+				#Send_Data(data)
+				Flag["SocketUsage"]="Receive Normal"
+				
 
 		
 class Connect_Wifi_Thread(threading.Thread):
@@ -104,41 +111,43 @@ class Receive_Data_Thread(threading.Thread):
 		global UI1
 		global Flag
 		while Flag["UIActive"]:
-			Data=Recieve_Data()
-			if len(Data)>2:
-				Data=Data[1:-1]
-				Data.split(":")
-				Flag["UDP"]=True
-			else:Flag["UDP"]=False
-			
-			
-			if len(Data)==len(UI1.DataPresDict):
-				if Flag["DataPres"]!=UI1.RowCounter-1:
-					TmpCnt=0
-					for x in UI1.DataPresDict:
-						UI1.DataPresDict[x][2][Flag["DataPres"]].set(Data[TmpCnt])
-						TmpCnt+=1
+			if Flag["SocketUsage"]=="Receive Normal":
+				Data=Recieve_Data()
+				if len(Data)>2:
+					Data=Data[1:-1]
+					Data.split(":")
+					Flag["UDP"]=True
+				else:Flag["UDP"]=False
+				
+				
+				if len(Data)==len(UI1.DataPresDict):
+					if Flag["DataPres"]!=UI1.RowCounter-1:
+						TmpCnt=0
+						for x in UI1.DataPresDict:
+							UI1.DataPresDict[x][2][Flag["DataPres"]].set(Data[TmpCnt])
+							TmpCnt+=1
+							
+						Flag["DataPres"]+=1
 						
-					Flag["DataPres"]+=1
-					
-				else:
-					TmpCnt=0
-					for x in UI1.DataPresDict:
-						for y in range(Flag["DataPres"]-2):
-							UI1.DataPresDict[x][2][y].set(UI1.DataPresDict[x][2][y+1].get())
-						UI1.DataPresDict[x][2][Flag["DataPres"]-1].set(Data[TmpCnt])
-						TmpCnt+=1
-			
-			
-			if Flag["Sync"]==False and len(Data)==11:				
-				CheckButtonCount=0
-				TmpStr=''
-				for x in UI1.CheckButtonDict:
-					if UI1.CheckButtonDict[x][1]==1:
-						TmpStr+=Data[CheckButtonCount]+'\t'
-					CheckButtonCount+=1
-				TmpStr+='\n'
-				DataFile.write(TmpStr)
+					else:
+						TmpCnt=0
+						for x in UI1.DataPresDict:
+							for y in range(Flag["DataPres"]-2):
+								UI1.DataPresDict[x][2][y].set(UI1.DataPresDict[x][2][y+1].get())
+							UI1.DataPresDict[x][2][Flag["DataPres"]-1].set(Data[TmpCnt])
+							TmpCnt+=1
+				
+				
+				if Flag["Sync"]==False and len(Data)==11:				
+					CheckButtonCount=0
+					TmpStr=''
+					for x in UI1.CheckButtonDict:
+						if UI1.CheckButtonDict[x][1]==1:
+							TmpStr+=Data[CheckButtonCount]+'\t'
+						CheckButtonCount+=1
+					TmpStr+='\n'
+					DataFile.write(TmpStr)
+				Flag["SocketUsage"]="Send Normal"
 		print("Exit Receiving Thread")
 		
 			
@@ -149,6 +158,8 @@ class Button_Send_Data_Thread(threading.Thread):
 		self.TmpTime=time.monotonic()
 		self.ContinueFlag=True
 		self.Msg=Msg
+		global Flag
+		Flag["SocketUsage"]="ButtonSend"
 		
 	def run(self):
 		self.TimeOutDuration=3
@@ -161,6 +172,8 @@ class Button_Send_Data_Thread(threading.Thread):
 		
 		if self.ContinueFlag:messagebox.showwarning("Quadcopter", "Timed Out, Check UDP Connection")
 		else: messagebox.showinfo("Quadcopter", self.Msg)
+		global Flag
+		Flag["SocketUsage"]="Receive Normal"
 		
 	
 
@@ -218,7 +231,7 @@ class UI:
 
 		
 		
-		self.CheckButtonDict=collections.OrderedDict([("pitch", []), ("roll", []), ("yaw", []), ("atm", []), ("height", []), ("throt", []), ("rot1", []), ("rot2", []), ("rot3", []), ("rot4", []), ("volt", [])])
+		self.CheckButtonDict=collections.OrderedDict([("roll", []), ("pitch", []), ("yaw", []), ("atm", []), ("height", []), ("throt", []), ("rot1", []), ("rot2", []), ("rot3", []), ("rot4", []), ("volt", [])])
 		#first for int var, second for buffer int, third for check button
 		for x in self.CheckButtonDict:
 			self.CheckButtonDict[x].append(IntVar())
@@ -538,7 +551,7 @@ class UI:
 			
 		
 
-Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False, "DataPres":0}
+Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False, "DataPres":0, "SocketUsage":"Receive Normal"}
 
 Address=("192.168.1.1", 239)
 Socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -552,10 +565,10 @@ UI1=UI(root)
 
 
 ConnectionThread=Connect_Wifi_Thread()
-#ConnectionThread.start()
+ConnectionThread.start()
 
 RcvDataThread=Receive_Data_Thread()
-#RcvDataThread.start()
+RcvDataThread.start()
 
 ThroSendDataThread=Throttle_Send_Data_Thread()
 ThroSendDataThread.start()
