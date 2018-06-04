@@ -16,7 +16,6 @@ import os
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-
 def Button_Trig_Send(Data, Msg):
 	TmpThread=Button_Send_Data_Thread(Data, Msg)
 	TmpThread.start()
@@ -148,6 +147,23 @@ class Button_Send_Data_Thread(threading.Thread):
 		else: messagebox.showinfo("Quadcopter", self.Msg)
 		
 	
+from tkinter.ttk import Label, Button, Checkbutton, Entry, Radiobutton, Notebook, Frame
+from tkinter import Tk, Canvas, messagebox, StringVar, IntVar
+import tkinter as tk
+import tkinter.ttk as ttk
+
+import collections
+import os.path
+
+import socket
+import time
+import datetime
+
+import threading
+import os
+
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class UI:
 	def __init__(self, master):		
@@ -230,12 +246,12 @@ class UI:
 				self.DataPresDict[x][2].append(IntVar(0))
 					
 		
+		#Control Tab 
 		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="groove", bg="#fff", bd=3)
 		self.ThrottleCanvas.bind('<B1-Motion>', self.Get_Throttle)
 		self.ThrottleCanvas.bind('<ButtonRelease-1>', self.Reset_Throttle)
 		self.ThrottleCanvas.bind('<Key>', self.Get_Direction)
 		self.ThrottleBall=self.ThrottleCanvas.create_oval(50, 400, 150, 500, fill="blue", tag='Ball')
-		self.ThrottleCanvas.grid(column=0, row=0, columnspan=2)
 		self.ThrottleBallPos={'Origin':[100, 450], 'Current':[100, 450]}
 		
 		
@@ -264,7 +280,11 @@ class UI:
 			self.ControlPres[x][2].grid(column=1, row=RowCounter)
 			RowCounter+=1
 			
-			
+		
+		#Control Pad gridding
+		self.ThrottleCanvas.grid(column=0, row=0, columnspan=2)
+		
+		
 		for x in range(3):self.ControlTab.grid_columnconfigure(x, weight=1)
 		for x in range(5):self.ControlTab.grid_rowconfigure(x, weight=1)
 			
@@ -322,8 +342,8 @@ class UI:
 			
 		#Radio Button
 		self.ThrottleRow.append(Label(self.ConfigTab, text="Throttle Side", style="TLabel", relief="groove", anchor=self.Allignment["Label"]))
-		self.ThrottleRow.append(Radiobutton(self.ConfigTab, text="Left", style="TRadiobutton", variable=self.ThrottleRow[0], value="L"))
-		self.ThrottleRow.append(Radiobutton(self.ConfigTab, text="Right", style="TRadiobutton", variable=self.ThrottleRow[0], value="R"))
+		self.ThrottleRow.append(Radiobutton(self.ConfigTab, text="Left", style="TRadiobutton", variable=self.ThrottleRow[0], value="L", command=self.Set_Throttle_Left))
+		self.ThrottleRow.append(Radiobutton(self.ConfigTab, text="Right", style="TRadiobutton", variable=self.ThrottleRow[0], value="R", command=self.Set_Throttle_Right))
 		if "L" ==self.ThrottleRow[0].get():self.ThrottleRow[2].invoke()
 		else:self.ThrottleRow[3].invoke()
 		self.ThrottleRow[1].grid(row=self.RowCounter, column=0, columnspan=10, sticky="NEWS")
@@ -501,6 +521,15 @@ class UI:
 		elif event.keycode==39 or event.char=='d':
 			print("Right")	
 			
+		
+	def Set_Throttle_Left(self):
+		self.ThrottleCanvas.grid_remove()
+		self.ThrottleCanvas.grid()
+	
+	def Set_Throttle_Right(self):
+		self.ThrottleCanvas.grid_remove()
+
+		
 		
 
 Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False, "DataPres":0}

@@ -4,7 +4,7 @@ root = Tk()
 
 def key(event):
 	print(event.keycode)
-	print ("pressed", event.char)
+	print ("pressed", event)
 
 def callback(event):
 	global frame
