@@ -33,13 +33,15 @@ def Send_Data(Data):
 
 def Recieve_Data():
 	global Address
+	RecAddr=('', 239)	
 	global Socket
-	RecAddr=('', Address[1])
+	Socket.bind(RecAddr)
+	print(RecAddr)
 	data=b''
-	try:
-		Socket.bind(RecAddr)
-	except:
-		print("Debug Socket Bind")
+	#try:
+	Socket.bind(RecAddr)
+	#except:
+	#	print("Debug Socket Bind")
 	
 	try:
 		Socket.settimeout(3.0)
@@ -60,6 +62,26 @@ def Open_Config(mode="r+"):
 	elif mode == "w":
 		ConfigFile=open("config.txt", mode)
 		return {"FileExist":True, "File":ConfigFile}
+
+
+class Throttle_Send_Data_Thread(threading.Thread):
+	def __init__(self):
+		threading.Thread.__init__(self)
+		
+	def run(self):
+		global UI1
+		global Flag
+		while Flag["UIActive"]:
+			if Flag["SocketUsage"]=="Send Normal":
+				data="@2"
+				for x in UI1.ControlPres:
+					data+=':'+UI1.ControlPres[x][0].get()
+				data+='#'
+				time.sleep(0.05)
+				#print(data)
+				#Send_Data(data)
+				Flag["SocketUsage"]="Receive Normal"
+				
 
 		
 class Connect_Wifi_Thread(threading.Thread):
@@ -88,41 +110,43 @@ class Receive_Data_Thread(threading.Thread):
 		global UI1
 		global Flag
 		while Flag["UIActive"]:
-			Data=Recieve_Data()
-			if len(Data)>2:
-				Data=Data[1:-1]
-				Data.split(":")
-				Flag["UDP"]=True
-			else:Flag["UDP"]=False
-			
-			
-			if len(Data)==len(UI1.DataPresDict):
-				if Flag["DataPres"]!=UI1.RowCounter-1:
-					TmpCnt=0
-					for x in UI1.DataPresDict:
-						UI1.DataPresDict[x][2][Flag["DataPres"]].set(Data[TmpCnt])
-						TmpCnt+=1
+			if Flag["SocketUsage"]=="Receive Normal":
+				Data=Recieve_Data()
+				if len(Data)>2:
+					Data=Data[1:-1]
+					Data.split(":")
+					Flag["UDP"]=True
+				else:Flag["UDP"]=False
+				
+				
+				if len(Data)==len(UI1.DataPresDict):
+					if Flag["DataPres"]!=UI1.RowCounter-1:
+						TmpCnt=0
+						for x in UI1.DataPresDict:
+							UI1.DataPresDict[x][2][Flag["DataPres"]].set(Data[TmpCnt])
+							TmpCnt+=1
+							
+						Flag["DataPres"]+=1
 						
-					Flag["DataPres"]+=1
-					
-				else:
-					TmpCnt=0
-					for x in UI1.DataPresDict:
-						for y in range(Flag["DataPres"]-2):
-							UI1.DataPresDict[x][2][y].set(UI1.DataPresDict[x][2][y+1].get())
-						UI1.DataPresDict[x][2][Flag["DataPres"]-1].set(Data[TmpCnt])
-						TmpCnt+=1
-			
-			
-			if Flag["Sync"]==False and len(Data)==11:				
-				CheckButtonCount=0
-				TmpStr=''
-				for x in UI1.CheckButtonDict:
-					if UI1.CheckButtonDict[x][1]==1:
-						TmpStr+=Data[CheckButtonCount]+'\t'
-					CheckButtonCount+=1
-				TmpStr+='\n'
-				DataFile.write(TmpStr)
+					else:
+						TmpCnt=0
+						for x in UI1.DataPresDict:
+							for y in range(Flag["DataPres"]-2):
+								UI1.DataPresDict[x][2][y].set(UI1.DataPresDict[x][2][y+1].get())
+							UI1.DataPresDict[x][2][Flag["DataPres"]-1].set(Data[TmpCnt])
+							TmpCnt+=1
+				
+				
+				if Flag["Sync"]==False and len(Data)==11:				
+					CheckButtonCount=0
+					TmpStr=''
+					for x in UI1.CheckButtonDict:
+						if UI1.CheckButtonDict[x][1]==1:
+							TmpStr+=Data[CheckButtonCount]+'\t'
+						CheckButtonCount+=1
+					TmpStr+='\n'
+					DataFile.write(TmpStr)
+				Flag["SocketUsage"]="Send Normal"
 		print("Exit Receiving Thread")
 		
 			
@@ -133,6 +157,8 @@ class Button_Send_Data_Thread(threading.Thread):
 		self.TmpTime=time.monotonic()
 		self.ContinueFlag=True
 		self.Msg=Msg
+		global Flag
+		Flag["SocketUsage"]="ButtonSend"
 		
 	def run(self):
 		self.TimeOutDuration=3
@@ -145,6 +171,8 @@ class Button_Send_Data_Thread(threading.Thread):
 		
 		if self.ContinueFlag:messagebox.showwarning("Quadcopter", "Timed Out, Check UDP Connection")
 		else: messagebox.showinfo("Quadcopter", self.Msg)
+		global Flag
+		Flag["SocketUsage"]="Receive Normal"
 		
 	
 from tkinter.ttk import Label, Button, Checkbutton, Entry, Radiobutton, Notebook, Frame
@@ -219,7 +247,7 @@ class UI:
 
 		
 		
-		self.CheckButtonDict=collections.OrderedDict([("pitch", []), ("roll", []), ("yaw", []), ("atm", []), ("height", []), ("throt", []), ("rot1", []), ("rot2", []), ("rot3", []), ("rot4", []), ("volt", [])])
+		self.CheckButtonDict=collections.OrderedDict([("roll", []), ("pitch", []), ("yaw", []), ("atm", []), ("height", []), ("throt", []), ("rot1", []), ("rot2", []), ("rot3", []), ("rot4", []), ("volt", [])])
 		#first for int var, second for buffer int, third for check button
 		for x in self.CheckButtonDict:
 			self.CheckButtonDict[x].append(IntVar())
@@ -244,14 +272,26 @@ class UI:
 		for x in self.DataPresDict:
 			for y in range(18):
 				self.DataPresDict[x][2].append(IntVar(0))
+				
 					
 		
+<<<<<<< HEAD:src/UI.py
 		#Control Tab 
 		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="groove", bg="#fff", bd=3)
+=======
+		self.ThrottleCanvas=Canvas(self.ControlTab, width=200, height=500, relief="groove", bg="#fff", bd=3)		
+		master.bind("<Key>", self.Get_Direction)
+>>>>>>> 4637a7fb3688dc7e1bd3b5bf77c144a113235896:UI.py
 		self.ThrottleCanvas.bind('<B1-Motion>', self.Get_Throttle)
+		self.ThrottleCanvas.bind('<Button-1>', self.Get_Throttle)
 		self.ThrottleCanvas.bind('<ButtonRelease-1>', self.Reset_Throttle)
-		self.ThrottleCanvas.bind('<Key>', self.Get_Direction)
 		self.ThrottleBall=self.ThrottleCanvas.create_oval(50, 400, 150, 500, fill="blue", tag='Ball')
+<<<<<<< HEAD:src/UI.py
+=======
+		self.ThrottleCanvas.create_line(75, 0, 75, 500)
+		self.ThrottleCanvas.create_line(125, 0, 125, 500)
+		self.ThrottleCanvas.grid(column=0, row=0, columnspan=2)
+>>>>>>> 4637a7fb3688dc7e1bd3b5bf77c144a113235896:UI.py
 		self.ThrottleBallPos={'Origin':[100, 450], 'Current':[100, 450]}
 		
 		
@@ -500,26 +540,42 @@ class UI:
 			self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
 			self.ThrottleBallPos['Current']=[event.x, event.y]
 			
-		else:
-			Diff=[self.ThrottleBallPos['Origin'][0]-self.ThrottleBallPos['Current'][0], self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1]]
-			self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
-			self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
-		print(self.ThrottleBallPos, Diff)
+		#else:
+			#Diff=[0, 0]
+			#self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
+			#self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
+			
+		if (self.ThrottleBallPos['Current'][1]-self.ThrottleBallPos['Origin'][1])<=0:
+			self.ControlPres['Throttle'][0].set(int((self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1])*int(self.LowerDict['Max Throttle Percentage'][1])/450))
+			
+		if (self.ThrottleBallPos['Current'][0]-self.ThrottleBallPos['Origin'][0])>25:
+			self.ControlPres['Yaw'][0].set(1)		
+		elif (self.ThrottleBallPos['Current'][0]-self.ThrottleBallPos['Origin'][0])<-25:
+			self.ControlPres['Yaw'][0].set(-1)			
+		else:self.ControlPres['Yaw'][0].set(0)
+		
+		#print(self.ThrottleBallPos, Diff)
 	
 	def Reset_Throttle(self, event):
 		Diff=[self.ThrottleBallPos['Origin'][0]-self.ThrottleBallPos['Current'][0], self.ThrottleBallPos['Origin'][1]-self.ThrottleBallPos['Current'][1]]
 		self.ThrottleCanvas.move(self.ThrottleBall, Diff[0], Diff[1])
 		self.ThrottleBallPos['Current']=self.ThrottleBallPos['Origin']
+		self.ControlPres['Throttle'][0].set(0)
+		self.ControlPres['Yaw'][0].set(0)
 		
 	def Get_Direction(self, event):
 		if event.keycode==38 or event.char=='w':
-			print("Forward")
+			if self.ControlPres['Pitch'][0].get()[0]=='-':self.ControlPres['Pitch'][0].set(0)
+			else:self.ControlPres['Pitch'][0].set(1*self.LowerDict['Stick Gain'][1])
 		elif event.keycode==40 or event.char=='s':
-			print("Backward")
-		elif event.keycode==37 or event.char=='a':
-			self.ControlPres
-		elif event.keycode==39 or event.char=='d':
-			print("Right")	
+			if self.ControlPres['Pitch'][0].get()[0]!='0' and self.ControlPres['Pitch'][0].get()[0]!='-':self.ControlPres['Pitch'][0].set(0)
+			else:self.ControlPres['Pitch'][0].set("-"+str(1*self.LowerDict['Stick Gain'][1]))
+		elif event.keycode==37 or event.char=='d':
+			if self.ControlPres['Roll'][0].get()[0]=='-':self.ControlPres['Roll'][0].set(0)
+			else:self.ControlPres['Roll'][0].set(1*self.LowerDict['Stick Gain'][1])
+		elif event.keycode==39 or event.char=='a':
+			if self.ControlPres['Roll'][0].get()[0]!='0' and self.ControlPres['Roll'][0].get()[0]!='-':self.ControlPres['Roll'][0].set(0)
+			else:self.ControlPres['Roll'][0].set("-"+str(1*self.LowerDict['Stick Gain'][1]))
 			
 		
 	def Set_Throttle_Left(self):
@@ -532,7 +588,7 @@ class UI:
 		
 		
 
-Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False, "DataPres":0}
+Flag={"Sync": False, "UIActive": True, "Connected": False, "UDP":False, "DataPres":0, "SocketUsage":"Receive Normal"}
 
 Address=("192.168.1.1", 239)
 Socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -541,14 +597,19 @@ Time=datetime.datetime
 DataFile=open(str(Time.now().month).zfill(2)+"."+str(Time.now().day).zfill(2)+" "+str(Time.now().hour).zfill(2)+"-"+str(Time.now().minute).zfill(2)+"-"+str(Time.now().second).zfill(2)+".txt", "w")
 
 root=Tk()
-
-ConnectionThread=Connect_Wifi_Thread()
-#ConnectionThread.start()
-
-RcvDataThread=Receive_Data_Thread()
-#RcvDataThread.start()
-
 root.deiconify()
 UI1=UI(root)
+
+
+ConnectionThread=Connect_Wifi_Thread()
+ConnectionThread.start()
+
+RcvDataThread=Receive_Data_Thread()
+RcvDataThread.start()
+
+ThroSendDataThread=Throttle_Send_Data_Thread()
+ThroSendDataThread.start()
+
+
 root.mainloop()
 Flag["UIActive"]=False

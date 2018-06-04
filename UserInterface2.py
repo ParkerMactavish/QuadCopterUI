@@ -237,6 +237,7 @@ class RecvDataThread(threading.Thread):
         HostAddr=('', Port)
         try:	
             RecSocketUdp.bind(HostAddr)
+            print(HostAddr)
         except:
             messagebox.showwarning("Quadcopter", "Host Address not available")
     def run(self):
