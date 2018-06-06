@@ -1,6 +1,30 @@
 '''
 This module is meant to define the packing of the UI, and the actions of the buttons.
---Last Edited on 18.06.03
+--Edited on 18.06.03
+
+This module requires:
+	-Label, Button, Checkbutton, Entry, Radiobutton, Notebook, Frame from tkinter.ttk
+	-Tk, Canvas, messagebox, StringVar, IntVar from tkinter
+	-tkinter[as:tk]
+	-tkinter.ttk[as:ttk]
+	-DataAccess[as:DA]
+This module contains:
+	-class UI
+	variable:
+		Alignment--a dictionary to store all kinds of alignment of widgets
+		Span--a diction to store all kinds of span of widgets
+		configFileName--a string to store the directory of the configuration file
+		#UI structure
+		NoteBook--a Notebook object of GUI
+			ConfigTab--a Frame object in NoteBook
+				ButtonDict[Lock, Unlock, Sync, Hold Altitude, Release Altitude][Button, Event]--a dictionary to store buttons on the top of ConfigTab
+				UpperLabelDict[PID, P, I, I Limit, D]--a dictionary to store labels under ButtonDict
+				UpperCells[Attitude Roll, Attitude Pitch, Attitude Yaw, Attitude Height, Rate Roll, Rate Pitch, Rate Yaw, Rate Height][Label, Entries, Values]--a dictionary to store labels, entries and values on the upper half of ConfigTab
+				LowerCells=Angular Velocity, Roll Angular Calibration, Pitch Angular Calibration, Stick Gain, Max Throttle Percentage][Label, Entry, Value]--a dictionary to store labels, entries and values on the lower half of ConfigTab
+				ThrottleRow[Label, Value, RadioButton[L, R]]--a dictionary to store the row of throttle radio button
+				CheckButtonDict[Pitch, Roll, Yaw, Air Pressure, Height, Throttle, Rotation 1, Rotation 2, Rotation 3, Rotation 4, Voltage][IntVar, BufferValue, CheckButton]--a dictionary to store the check buttons on the bottom of the ConfigTab
+			ControlTab--a Frame object in NoteBook
+--Edited on 18.06.04		
 '''
 ##COULD possibly be replaced by some other form of User Interface##
 
@@ -29,9 +53,9 @@ import src.DataAccess as DA
 
 ##main part
 class UI:
-	#Constant for Allignment, Span, and File Name
-	#Allignment for all kinds of widgets
-	Allignment={"Button": "center", "Label": "center", "Entry": "center", "RadioButton": "center", "CheckButton": "center"}
+	#Constant for Alignment, Span, and File Name
+	#Alignment for all kinds of widgets
+	Alignment={"Button": "center", "Label": "center", "Entry": "center", "RadioButton": "center", "CheckButton": "center"}
 	
 	#Span for different rows of widgets
 	Span={"topButton":6, "upperLabel":6, "upperCellLabel":6, "upperCellEntry":6, "lowerCellLabel":15, "lowerCellEntry":15, "throttleRadioButton":10, "checkButton":5}
@@ -151,11 +175,11 @@ class UI:
 		master.grid_columnconfigure(0, weight=1)
 
 		#Styling
-		ttk.Style().configure("TButton", padding=5, background="#ccc", anchor=self.Allignment["Button"])
+		ttk.Style().configure("TButton", padding=5, background="#ccc", anchor=self.Alignment["Button"])
 		ttk.Style().configure("TLabel", padding=3)
 		ttk.Style().configure("TEntry", padding=3)
-		ttk.Style().configure("TRadiobutton", padding=3, anchor=self.Allignment["RadioButton"])
-		ttk.Style().configure("TCheckbutton", padding=3, anchor=self.Allignment["CheckButton"])
+		ttk.Style().configure("TRadiobutton", padding=3, anchor=self.Alignment["RadioButton"])
+		ttk.Style().configure("TCheckbutton", padding=3, anchor=self.Alignment["CheckButton"])
 		
 		#Creating Notebook on master
 		self.NoteBook=Notebook(master)
@@ -190,7 +214,7 @@ class UI:
 		#Creating Labels on the top and putting them into the UpperLabelDict
 		columnCounter=0
 		for x in self.UpperLabelDict:
-			self.UpperLabelDict[x]=Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"])
+			self.UpperLabelDict[x]=Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Alignment["Label"])
 			self.UpperLabelDict[x].grid(row=rowCounter, column=columnCounter*self.Span["upperLabel"], columnspan=self.Span["upperLabel"], sticky="NEWS")
 			columnCounter+=1
 		rowCounter+=1
@@ -200,12 +224,12 @@ class UI:
 		for x in self.UpperCells:
 			columnCounter=0
 			#Labels
-			self.UpperCells[x]["Label"]=Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"])
+			self.UpperCells[x]["Label"]=Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Alignment["Label"])
 			self.UpperCells[x]["Label"].grid(row=rowCounter, column=columnCounter*self.Span["upperCellLabel"], columnspan=self.Span["upperCellLabel"], sticky="NEWS")
 			columnCounter=1
 			#Entries
 			for y in range(len(self.UpperLabelDict)-1):
-				self.UpperCells[x]["Entries"].append(Entry(self.ConfigTab, style="TEntry", justify=self.Allignment["Entry"]))
+				self.UpperCells[x]["Entries"].append(Entry(self.ConfigTab, style="TEntry", justify=self.Alignment["Entry"]))
 				self.UpperCells[x]["Entries"][y].insert("end", self.UpperCells[x]["Values"][y])
 				self.UpperCells[x]["Entries"][y].grid(row=rowCounter, column=columnCounter*self.Span["upperCellEntry"], columnspan=self.Span["upperCellEntry"], sticky="NEWS")
 				columnCounter+=1
@@ -214,8 +238,8 @@ class UI:
 
 		#Creating Labels and Entries on the lower half and putting them into the LowerCells	
 		for x in self.LowerCells:
-			self.LowerCells[x]["Label"]=Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Allignment["Label"])
-			self.LowerCells[x]["Entry"]=Entry(self.ConfigTab, style="TEntry", justify=self.Allignment["Entry"])
+			self.LowerCells[x]["Label"]=Label(self.ConfigTab, text=x, style="TLabel", relief="groove", anchor=self.Alignment["Label"])
+			self.LowerCells[x]["Entry"]=Entry(self.ConfigTab, style="TEntry", justify=self.Alignment["Entry"])
 			self.LowerCells[x]["Label"].grid(row=rowCounter, column=0, columnspan=self.Span["lowerCellLabel"], sticky="NEWS")
 			self.LowerCells[x]["Entry"].insert("end", self.LowerCells[x]["Value"])
 			self.LowerCells[x]["Entry"].grid(row=rowCounter, column=self.Span["lowerCellLabel"], columnspan=self.Span["lowerCellEntry"], sticky="NEWS")
@@ -223,7 +247,7 @@ class UI:
 		
 		
 		#Creating Radio Button for the throttle row and putting them into the ThrottleRow
-		self.ThrottleRow["Label"]=Label(self.ConfigTab, text="Throttle Side", style="TLabel", relief="groove", anchor=self.Allignment["Label"])
+		self.ThrottleRow["Label"]=Label(self.ConfigTab, text="Throttle Side", style="TLabel", relief="groove", anchor=self.Alignment["Label"])
 		self.ThrottleRow["RadioButton"]["L"]=Radiobutton(self.ConfigTab, text="Left", style="TRadiobutton", variable=self.ThrottleRow["Value"], value="L", command=self.set_Throttle_Left)
 		self.ThrottleRow["RadioButton"]["R"]=Radiobutton(self.ConfigTab, text="Right", style="TRadiobutton", variable=self.ThrottleRow["Value"], value="R", command=self.set_Throttle_Right)
 		#if the Value stores "L" then invoke the radio button on the left side. if "R" then otherwise
